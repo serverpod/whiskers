@@ -1,0 +1,12 @@
+name: whiskers
+description: A templating library that implements the Mustache template specification
+version: 2.0.4
+
+environment:
+  sdk: ^3.9.0
+
+dev_dependencies:
+  test: ^1.16.5
+
+topics:
+  - template

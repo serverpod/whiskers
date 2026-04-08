@@ -1,0 +1,24 @@
+# https://dart.dev/guides/libraries/private-files
+
+# Pub and Dart tooling
+.dart_tool/
+.packages
+
+# Library package: lockfile is for apps; resolve deps from pubspec.yaml
+pubspec.lock
+
+# Code generation / compilation artifacts
+build/
+
+# Documentation (regenerate with dart doc)
+doc/api/
+
+# Test coverage
+coverage/
+*.lcov
+
+# IDE / OS
+.idea/
+*.swp
+*.swo
+.DS_Store
