@@ -39,17 +39,25 @@ class TextNode extends Node {
 }
 
 class VariableNode extends Node {
-  VariableNode(this.name, int start, int end, {this.escape = true})
-    : super(start, end);
+  VariableNode(
+    this.name,
+    int start,
+    int end, {
+    this.escape = true,
+    this.strictNameValid = true,
+  }) : super(start, end);
 
   final String name;
   final bool escape;
+  final bool strictNameValid;
 
   @override
   void accept(Visitor visitor) => visitor.visitVariable(this);
 
   @override
-  String toString() => '(VariableNode "$name" escape: $escape $start $end)';
+  String toString() =>
+      '(VariableNode "$name" escape: $escape '
+      'strictNameValid: $strictNameValid $start $end)';
 }
 
 class SectionNode extends Node {

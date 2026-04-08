@@ -1,6 +1,8 @@
-# Mustache templates with extensions
+# Whiskers - Mustache templates with extensions
 
-A Dart library to parse and render [mustache templates](https://mustache.github.io/).
+A Dart library for parsing and rendering [Mustache templates](https://mustache.github.io/). It is derived from [mustache_template](https://pub.dev/packages/mustache_template) and adds an optional `onMissingVariable` callback to `renderString` and `render`. This makes it possible to extend templates with custom behavior. It is used by the web server in [Serverpod](https://serverpod.dev) for cache busting.
+
+![Whiskers logo](https://raw.githubusercontent.com/serverpod/whiskers/main/misc/whiskers.webp)
 
 See the [mustache manual](https://mustache.github.io/mustache.5.html) for detailed usage information.
 
@@ -32,13 +34,49 @@ main() {
 }
 ```
 
-A template is parsed when it is created, after parsing it can be rendered any number of times with different values. A TemplateException is thrown if there is a problem parsing or rendering the template.
+A template is parsed when it is created. After parsing, it can be rendered any
+number of times with different values. A `TemplateException` is thrown if there
+is a problem parsing or rendering the template.
 
-The Template contstructor allows passing a name, this name will be used in error messages. When working with a number of templates, it is important to pass a name so that the error messages specify which template caused the error.
+The `Template` constructor allows passing a `name`. This name is used in error
+messages. When working with multiple templates, it is helpful to pass a name so
+that error messages clearly identify which template caused the error.
 
-By default all output from `{{variable}}` tags is html escaped, this behaviour can be changed by passing htmlEscapeValues : false to the Template constructor. You can also use a `{{{triple mustache}}}` tag, or a unescaped variable tag `{{&unescaped}}`, the output from these tags is not escaped.
+By default, all output from `{{variable}}` tags is HTML-escaped. This behavior
+can be changed by passing `htmlEscapeValues: false` to the `Template`
+constructor. You can also use a `{{{triple mustache}}}` tag or an unescaped
+variable tag like `{{&unescaped}}`; output from those tags is not escaped.
 
-## Differences between strict mode and lenient mode.
+## Handling missing variables
+
+```dart
+import 'package:whiskers/whiskers.dart';
+
+void main() {
+  final template = Template(
+    '<script src="app.js?v={{cacheBuster}}"></script>',
+    name: 'index.html',
+  );
+
+  final output = template.renderString(
+    const {},
+    onMissingVariable: (name, _) {
+      if (name == 'cacheBuster') {
+        return '20260408';
+      }
+      return null;
+    },
+  );
+
+  print(output);
+}
+```
+
+If `onMissingVariable` returns a string, that value is rendered in place of the
+missing variable. If it returns `null`, the default behavior is preserved:
+strict mode throws and lenient mode renders nothing.
+
+## Differences between strict mode and lenient mode
 
 ### Strict mode (default)
 

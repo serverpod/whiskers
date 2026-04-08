@@ -524,6 +524,313 @@ void main() {
     });
   });
 
+  group('Missing variable callback', () {
+    String renderWithCallback(
+      String source, {
+      Object? values = const <String, Object?>{},
+      bool lenient = false,
+      bool htmlEscapeValues = true,
+      String? name,
+      MissingVariableCallback? onMissingVariable,
+    }) {
+      final template = name == null
+          ? Template(
+              source,
+              lenient: lenient,
+              htmlEscapeValues: htmlEscapeValues,
+            )
+          : Template(
+              source,
+              lenient: lenient,
+              htmlEscapeValues: htmlEscapeValues,
+              name: name,
+            );
+      return template.renderString(
+        values,
+        onMissingVariable: onMissingVariable,
+      );
+    }
+
+    String renderPartialWithCallback(
+      Map<String, Object?> values,
+      Map<String, String> sources,
+      String renderTemplate, {
+      bool lenient = false,
+      MissingVariableCallback? onMissingVariable,
+    }) {
+      final templates = <String, Template>{};
+      Template? resolver(String name) => templates[name];
+      for (final entry in sources.entries) {
+        templates[entry.key] = Template(
+          entry.value,
+          name: entry.key,
+          lenient: lenient,
+          partialResolver: resolver,
+        );
+      }
+      return templates[renderTemplate]!.renderString(
+        values,
+        onMissingVariable: onMissingVariable,
+      );
+    }
+
+    test('renderString substitutes in strict mode', () {
+      final String output = renderWithCallback(
+        'Hello, {{name}}!',
+        onMissingVariable: (_, __) => 'world',
+      );
+      expect(output, equals('Hello, world!'));
+    });
+
+    test('renderString substitutes in lenient mode', () {
+      final String output = renderWithCallback(
+        'Hello, {{name}}!',
+        lenient: true,
+        onMissingVariable: (_, __) => 'world',
+      );
+      expect(output, equals('Hello, world!'));
+    });
+
+    test('render only calls callback for missing variables', () {
+      final buffer = StringBuffer();
+      final missingNames = <String>[];
+      Template('{{present}} {{missing}}').render(
+        <String, String>{'present': 'hi'},
+        buffer,
+        onMissingVariable: (String name, MissingVariableContext context) {
+          missingNames.add(name);
+          expect(context.source, equals('{{present}} {{missing}}'));
+          return 'there';
+        },
+      );
+      expect(buffer.toString(), equals('hi there'));
+      expect(missingNames, equals(<String>['missing']));
+    });
+
+    test('works with multiple missing values', () {
+      final missingNames = <String>[];
+      final String output = renderWithCallback(
+        '{{first}} {{second}} {{first}}',
+        onMissingVariable: (String name, MissingVariableContext context) {
+          missingNames.add(name);
+          expect(context.source, equals('{{first}} {{second}} {{first}}'));
+          return '<$name>';
+        },
+      );
+
+      expect(output, equals('&lt;first&gt; &lt;second&gt; &lt;first&gt;'));
+      expect(missingNames, equals(<String>['first', 'second', 'first']));
+    });
+
+    test('works with strange variable names in lenient mode', () {
+      final missingNames = <String>[];
+      final String output = renderWithCallback(
+        r'{{foo/bar}} {{pipe|bang!}}',
+        lenient: true,
+        onMissingVariable: (String name, MissingVariableContext context) {
+          missingNames.add(name);
+          expect(context.htmlEscape, isTrue);
+          return '[$name]';
+        },
+      );
+
+      expect(output, equals('[foo&#x2F;bar] [pipe|bang!]'));
+      expect(missingNames, equals(<String>['foo/bar', 'pipe|bang!']));
+    });
+
+    test('works with strange variable names in strict mode', () {
+      final missingNames = <String>[];
+      final String output = renderWithCallback(
+        r'{{foo/bar}} {{pipe|bang!}}',
+        onMissingVariable: (String name, MissingVariableContext context) {
+          missingNames.add(name);
+          expect(context.htmlEscape, isTrue);
+          return '[$name]';
+        },
+      );
+
+      expect(output, equals('[foo&#x2F;bar] [pipe|bang!]'));
+      expect(missingNames, equals(<String>['foo/bar', 'pipe|bang!']));
+    });
+
+    test('strange variable names remain strict when callback returns null', () {
+      expect(
+        () => renderWithCallback(
+          r'{{foo/bar}}',
+          onMissingVariable: (_, __) => null,
+        ),
+        throwsA(
+          isA<TemplateException>().having(
+            (TemplateException ex) => ex.message,
+            'message',
+            startsWith(BAD_TAG_NAME),
+          ),
+        ),
+      );
+    });
+
+    test('null callback keeps strict behavior', () {
+      expect(
+        () => renderWithCallback(
+          '{{missing}}',
+          onMissingVariable: (_, __) => null,
+        ),
+        throwsA(isA<TemplateException>()),
+      );
+    });
+
+    test('null callback keeps lenient behavior', () {
+      final String output = renderWithCallback(
+        '{{missing}}',
+        lenient: true,
+        onMissingVariable: (_, __) => null,
+      );
+      expect(output, equals(''));
+    });
+
+    test('null values are not treated as missing', () {
+      var called = false;
+      final String output = renderWithCallback(
+        '{{value}}',
+        values: <String, Object?>{'value': null},
+        onMissingVariable: (_, __) {
+          called = true;
+          return 'fallback';
+        },
+      );
+      expect(output, equals(''));
+      expect(called, isFalse);
+    });
+
+    test('escaped callback output in strict mode', () {
+      final String output = renderWithCallback(
+        '{{missing}}',
+        onMissingVariable: (_, __) => '&',
+      );
+      expect(output, equals('&amp;'));
+    });
+
+    test('escaped callback output in lenient mode', () {
+      final String output = renderWithCallback(
+        '{{missing}}',
+        lenient: true,
+        onMissingVariable: (_, __) => '&',
+      );
+      expect(output, equals('&amp;'));
+    });
+
+    test('callback output respects htmlEscapeValues false', () {
+      final String output = renderWithCallback(
+        '{{missing}}',
+        htmlEscapeValues: false,
+        onMissingVariable: (_, __) => '&',
+      );
+      expect(output, equals('&'));
+    });
+
+    test('triple mustache does not escape callback output', () {
+      final String output = renderWithCallback(
+        '{{{missing}}}',
+        onMissingVariable: (_, __) => '&',
+      );
+      expect(output, equals('&'));
+    });
+
+    test('ampersand tag does not escape callback output', () {
+      final String output = renderWithCallback(
+        '{{& missing}}',
+        onMissingVariable: (_, __) => '&',
+      );
+      expect(output, equals('&'));
+    });
+
+    test('provides callback context', () {
+      const source = 'Hello, {{name}}!';
+      String? callbackName;
+      MissingVariableContext? callbackContext;
+      final String output = renderWithCallback(
+        source,
+        name: 'greeting',
+        onMissingVariable: (String name, MissingVariableContext context) {
+          callbackName = name;
+          callbackContext = context;
+          return '&';
+        },
+      );
+
+      expect(output, equals('Hello, &amp;!'));
+      expect(callbackName, equals('name'));
+      expect(callbackContext, isNotNull);
+      expect(callbackContext!.templateName, equals('greeting'));
+      expect(callbackContext!.source, equals(source));
+      expect(callbackContext!.offset, equals(source.indexOf('{{name}}')));
+      expect(callbackContext!.htmlEscape, isTrue);
+    });
+
+    test('section subtree uses callback in strict mode', () {
+      final String output = renderWithCallback(
+        '{{#section}}{{missing}}{{/section}}',
+        values: <String, Object>{'section': true},
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+
+    test('section subtree uses callback in lenient mode', () {
+      final String output = renderWithCallback(
+        '{{#section}}{{missing}}{{/section}}',
+        values: <String, Object>{'section': true},
+        lenient: true,
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+
+    test('partial uses callback in strict mode', () {
+      final String output = renderPartialWithCallback(
+        <String, Object?>{},
+        <String, String>{'root': '{{>partial}}', 'partial': '{{missing}}'},
+        'root',
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+
+    test('partial uses callback in lenient mode', () {
+      final String output = renderPartialWithCallback(
+        <String, Object?>{},
+        <String, String>{'root': '{{>partial}}', 'partial': '{{missing}}'},
+        'root',
+        lenient: true,
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+
+    test('lambda subtree uses callback in strict mode', () {
+      final String output = renderWithCallback(
+        '{{#lambda}}{{missing}}{{/lambda}}',
+        values: <String, Object>{
+          'lambda': (LambdaContext context) => context.renderString(),
+        },
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+
+    test('lambda subtree uses callback in lenient mode', () {
+      final String output = renderWithCallback(
+        '{{#lambda}}{{missing}}{{/lambda}}',
+        values: <String, Object>{
+          'lambda': (LambdaContext context) => context.renderString(),
+        },
+        lenient: true,
+        onMissingVariable: (_, __) => 'value',
+      );
+      expect(output, equals('value'));
+    });
+  });
+
   group('Partial tag', () {
     String partialTest(
       Map<String, Object> values,

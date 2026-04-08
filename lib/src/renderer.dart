@@ -20,6 +20,7 @@ class Renderer extends Visitor {
     this.templateName,
     this.indent,
     this.source,
+    this.onMissingVariable,
   ) : _stack = List<Object?>.from(stack);
 
   Renderer.partial(Renderer ctx, Template partial, String indent)
@@ -32,6 +33,7 @@ class Renderer extends Visitor {
         ctx.templateName,
         ctx.indent + indent,
         partial.source,
+        ctx.onMissingVariable,
       );
 
   Renderer.subtree(Renderer ctx, StringSink sink)
@@ -44,6 +46,7 @@ class Renderer extends Visitor {
         ctx.templateName,
         ctx.indent,
         ctx.source,
+        ctx.onMissingVariable,
       );
 
   Renderer.lambda(Renderer ctx, String source, String indent, StringSink sink)
@@ -56,6 +59,7 @@ class Renderer extends Visitor {
         ctx.templateName,
         ctx.indent + indent,
         source,
+        ctx.onMissingVariable,
       );
 
   final StringSink sink;
@@ -66,6 +70,7 @@ class Renderer extends Visitor {
   final String? templateName;
   final String indent;
   final String source;
+  final m.MissingVariableCallback? onMissingVariable;
 
   void push(Object? value) => _stack.add(value);
 
@@ -113,6 +118,29 @@ class Renderer extends Visitor {
 
   @override
   void visitVariable(VariableNode node) {
+    final bool escape = node.escape && htmlEscapeValues;
+    if (!lenient && !node.strictNameValid) {
+      final String? replacement = onMissingVariable?.call(
+        node.name,
+        m.MissingVariableContext(
+          templateName: templateName,
+          source: source,
+          offset: node.start,
+          htmlEscape: escape,
+        ),
+      );
+      if (replacement == null) {
+        throw error(
+          'Unless in lenient mode, tags may only contain the '
+          'characters a-z, A-Z, minus, underscore and period.',
+          node,
+        );
+      }
+      final String output = escape ? _htmlEscape(replacement) : replacement;
+      write(output);
+      return;
+    }
+
     Object? value = resolveValue(node.name);
 
     if (value is Function) {
@@ -126,16 +154,29 @@ class Renderer extends Visitor {
     }
 
     if (value == noSuchProperty) {
+      value =
+          onMissingVariable?.call(
+            node.name,
+            m.MissingVariableContext(
+              templateName: templateName,
+              source: source,
+              offset: node.start,
+              htmlEscape: escape,
+            ),
+          ) ??
+          noSuchProperty;
+    }
+
+    if (value == noSuchProperty) {
       if (!lenient) {
         throw error('Value was missing for variable tag: ${node.name}.', node);
       }
-    } else {
-      final valueString = (value == null) ? '' : value.toString();
-      final String output = !node.escape || !htmlEscapeValues
-          ? valueString
-          : _htmlEscape(valueString);
-      write(output);
+      return;
     }
+
+    final valueString = (value == null) ? '' : value.toString();
+    final String output = escape ? _htmlEscape(valueString) : valueString;
+    write(output);
   }
 
   @override

@@ -361,7 +361,12 @@ class Parser {
           throw _error('Tags may not contain newlines or tabs.', open.start);
         }
 
-        if (!_validIdentifier.hasMatch(name)) {
+        final isVariableTag = const <TagType>{
+          TagType.variable,
+          TagType.unescapedVariable,
+          TagType.tripleMustache,
+        }.contains(tagType);
+        if (!_validIdentifier.hasMatch(name) && !isVariableTag) {
           throw _error(
             'Unless in lenient mode, tags may only contain the '
             'characters a-z, A-Z, minus, underscore and period.',
@@ -399,7 +404,13 @@ class Parser {
       case TagType.unescapedVariable:
       case TagType.tripleMustache:
         final escape = tag.type == TagType.variable;
-        node = VariableNode(tag.name, tag.start, tag.end, escape: escape);
+        node = VariableNode(
+          tag.name,
+          tag.start,
+          tag.end,
+          escape: escape,
+          strictNameValid: _validIdentifier.hasMatch(tag.name),
+        );
 
       case TagType.partial:
         node = PartialNode(tag.name, tag.start, tag.end, partialIndent);

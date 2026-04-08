@@ -281,14 +281,12 @@ void main() {
     test('corner case strict', () {
       const source = '{{{ #foo }}} {{{ /foo }}}';
       final parser = Parser(source, 'foo', '{{ }}');
-      try {
-        parser.parse();
-        // TODO(stuartmorgan): Restructure test to use throwsA.
-        // ignore: use_test_throws_matchers
-        fail('Should fail.');
-      } on Exception catch (e) {
-        expect(e is TemplateException, isTrue);
-      }
+      final List<Node> nodes = parser.parse();
+      expectNodes(nodes, <Node>[
+        VariableNode('#foo', 0, 12, escape: false, strictNameValid: false),
+        TextNode(' ', 12, 13),
+        VariableNode('/foo', 13, 25, escape: false, strictNameValid: false),
+      ]);
     });
 
     test('corner case lenient', () {

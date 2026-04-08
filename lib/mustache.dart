@@ -24,19 +24,75 @@ abstract class Template {
   String get source;
 
   /// [values] can be a combination of Map, List, String. Any non-String object
-  /// will be converted using toString(). Null values will cause a
-  /// [TemplateException], unless lenient module is enabled.
-  String renderString(Object? values);
+  /// will be converted using `toString()`.
+  ///
+  /// If a variable tag resolves to a missing value, [onMissingVariable] is
+  /// called before strict or lenient missing-variable handling is applied. If
+  /// the callback returns a string, that string is rendered in place of the
+  /// missing variable. If it returns `null`, the existing behavior is kept:
+  /// strict mode throws [TemplateException], while lenient mode renders
+  /// nothing.
+  ///
+  /// Null values that are present in the data are rendered as empty strings.
+  String renderString(
+    Object? values, {
+    MissingVariableCallback? onMissingVariable,
+  });
 
   /// [values] can be a combination of Map, List, String. Any non-String object
-  /// will be converted using toString(). Null values will cause a
-  /// [TemplateException], unless lenient module is enabled.
-  void render(Object? values, StringSink sink);
+  /// will be converted using `toString()`.
+  ///
+  /// If a variable tag resolves to a missing value, [onMissingVariable] is
+  /// called before strict or lenient missing-variable handling is applied. If
+  /// the callback returns a string, that string is rendered in place of the
+  /// missing variable. If it returns `null`, the existing behavior is kept:
+  /// strict mode throws [TemplateException], while lenient mode renders
+  /// nothing.
+  ///
+  /// Null values that are present in the data are rendered as empty strings.
+  void render(
+    Object? values,
+    StringSink sink, {
+    MissingVariableCallback? onMissingVariable,
+  });
 }
 
 // TODO(stuartmorgan): Remove this. See https://github.com/flutter/flutter/issues/174722.
 // ignore: public_member_api_docs
 typedef PartialResolver = Template? Function(String);
+
+/// Called when rendering encounters a missing variable.
+///
+/// The callback receives the missing variable name and contextual information
+/// about the current render. Returning a string substitutes that value for the
+/// missing variable. Returning `null` preserves the default strict or lenient
+/// behavior.
+typedef MissingVariableCallback =
+    String? Function(String name, MissingVariableContext context);
+
+/// Context passed to [MissingVariableCallback].
+///
+/// This describes the missing variable occurrence currently being rendered.
+class MissingVariableContext {
+  const MissingVariableContext({
+    required this.templateName,
+    required this.source,
+    required this.offset,
+    required this.htmlEscape,
+  });
+
+  /// The name used to identify the template, if any.
+  final String? templateName;
+
+  /// The template source being rendered.
+  final String source;
+
+  /// The character offset of the missing variable tag.
+  final int offset;
+
+  /// Whether the replacement text will be HTML-escaped.
+  final bool htmlEscape;
+}
 
 // TODO(stuartmorgan): Remove this. See https://github.com/flutter/flutter/issues/174722.
 // ignore: public_member_api_docs
