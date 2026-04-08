@@ -1,4 +1,4 @@
-# Mustache templates
+# Mustache templates with extensions
 
 A Dart library to parse and render [mustache templates](https://mustache.github.io/).
 
