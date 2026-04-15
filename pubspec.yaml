@@ -1,6 +1,6 @@
 name: whiskers
 description: A templating library that implements the Mustache template specification, but is extendable.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/serverpod/whiskers
 repository: https://github.com/serverpod/whiskers
 issue_tracker: https://github.com/serverpod/whiskers/issues
